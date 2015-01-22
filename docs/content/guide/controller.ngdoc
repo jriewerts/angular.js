@@ -1,5 +1,6 @@
 @ngdoc overview
 @name Controllers
+@sortOrder 220
 @description
 
 # Understanding Controllers
@@ -325,7 +326,7 @@ describe('state', function() {
         expect(childScope.timeOfDay).toBe('morning');
         expect(childScope.name).toBe('Mattie');
         expect(grandChildScope.timeOfDay).toBe('evening');
-        expect(grandChildScope.name).toBe('Gingerbreak Baby');
+        expect(grandChildScope.name).toBe('Gingerbread Baby');
     });
 });
 ```

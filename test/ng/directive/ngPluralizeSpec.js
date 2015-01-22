@@ -5,7 +5,7 @@ describe('ngPluralize', function() {
     elementAlt;
 
 
-  afterEach(function(){
+  afterEach(function() {
     dealoc(element);
     dealoc(elementAlt);
   });
@@ -146,6 +146,57 @@ describe('ngPluralize', function() {
     }));
   });
 
+  describe('undefined rule cases', function() {
+    var $locale, $log;
+    beforeEach(inject(function(_$locale_, _$log_) {
+      $locale = _$locale_;
+      $log = _$log_;
+    }));
+    afterEach(inject(function($log) {
+      $log.reset();
+    }));
+
+    it('should generate a warning when being asked to use a rule that is not defined',
+      inject(function($rootScope, $compile) {
+      element = $compile(
+          '<ng:pluralize count="email"' +
+                         "when=\"{'0': 'Zero'," +
+                                 "'one': 'Some text'," +
+                                 "'other': 'Some text'}\">" +
+          '</ng:pluralize>')($rootScope);
+      $locale.pluralCat = function() {return "few";};
+
+      $rootScope.email = '3';
+      expect($log.debug.logs).toEqual([]);
+      $rootScope.$digest();
+      expect(element.text()).toBe('');
+      expect($log.debug.logs.shift())
+        .toEqual(["ngPluralize: no rule defined for 'few' in {'0': 'Zero','one': 'Some text','other': 'Some text'}"]);
+    }));
+
+    it('should empty the element content when using a rule that is not defined',
+      inject(function($rootScope, $compile) {
+      element = $compile(
+          '<ng:pluralize count="email"' +
+                         "when=\"{'0': 'Zero'," +
+                                 "'one': 'Some text'," +
+                                 "'other': 'Some text'}\">" +
+          '</ng:pluralize>')($rootScope);
+      $locale.pluralCat = function(count) {return count === 1 ? "one" : "few";};
+
+      $rootScope.email = '0';
+      $rootScope.$digest();
+      expect(element.text()).toBe('Zero');
+
+      $rootScope.email = '3';
+      $rootScope.$digest();
+      expect(element.text()).toBe('');
+
+      $rootScope.email = '1';
+      $rootScope.$digest();
+      expect(element.text()).toBe('Some text');
+    }));
+  });
 
   describe('deal with pluralized strings with offset', function() {
     it('should show single/plural strings with offset', inject(function($rootScope, $compile) {
@@ -241,5 +292,77 @@ describe('ngPluralize', function() {
         expect(elementAlt.text()).toBe('Igor and 2 other people are viewing.');
       });
     });
+  });
+
+
+  describe('bind-once', function() {
+
+    it('should support for `count` to be a one-time expression',
+      inject(function($compile, $rootScope) {
+        element = $compile(
+            '<ng:pluralize count="::email"' +
+                           "when=\"{'one': 'You have one new email'," +
+                                   "'other': 'You have {} new emails'}\">" +
+            '</ng:pluralize>')($rootScope);
+        elementAlt = $compile(
+            '<ng:pluralize count="::email" ' +
+                           "when-one='You have one new email' " +
+                           "when-other='You have {} new emails'>" +
+            '</ng:pluralize>')($rootScope);
+
+        $rootScope.email = undefined;
+        $rootScope.$digest();
+        expect(element.text()).toBe('');
+        expect(elementAlt.text()).toBe('');
+
+        $rootScope.email = 3;
+        $rootScope.$digest();
+        expect(element.text()).toBe('You have 3 new emails');
+        expect(elementAlt.text()).toBe('You have 3 new emails');
+
+        $rootScope.email = 2;
+        $rootScope.$digest();
+        expect(element.text()).toBe('You have 3 new emails');
+        expect(elementAlt.text()).toBe('You have 3 new emails');
+
+        $rootScope.email = 1;
+        $rootScope.$digest();
+        expect(element.text()).toBe('You have 3 new emails');
+        expect(elementAlt.text()).toBe('You have 3 new emails');
+      })
+    );
+
+
+    it('should still update other embedded expressions',
+      inject(function($compile, $rootScope) {
+        element = $compile(
+            '<ng:pluralize count="::email"' +
+                           "when=\"{'one': 'You, {{user}}, have one new email'," +
+                                   "'other': 'You, {{user}}, have {} new emails'}\">" +
+            '</ng:pluralize>')($rootScope);
+        elementAlt = $compile(
+            '<ng:pluralize count="::email" ' +
+                           "when-one='You, {{user}}, have one new email' " +
+                           "when-other='You, {{user}}, have {} new emails'>" +
+            '</ng:pluralize>')($rootScope);
+
+        $rootScope.user = 'Lucas';
+        $rootScope.email = undefined;
+        $rootScope.$digest();
+        expect(element.text()).toBe('');
+        expect(elementAlt.text()).toBe('');
+
+        $rootScope.email = 3;
+        $rootScope.$digest();
+        expect(element.text()).toBe('You, Lucas, have 3 new emails');
+        expect(elementAlt.text()).toBe('You, Lucas, have 3 new emails');
+
+        $rootScope.user = 'Pete';
+        $rootScope.email = 2;
+        $rootScope.$digest();
+        expect(element.text()).toBe('You, Pete, have 3 new emails');
+        expect(elementAlt.text()).toBe('You, Pete, have 3 new emails');
+      })
+    );
   });
 });

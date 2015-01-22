@@ -6,6 +6,7 @@
   jqLite: true,
   jQuery: true,
   slice: true,
+  splice: true,
   push: true,
   toString: true,
   ngMinErr: true,
@@ -21,13 +22,12 @@
   nodeName_: true,
   isArrayLike: true,
   forEach: true,
-  sortedKeys: true,
   forEachSorted: true,
   reverseParams: true,
   nextUid: true,
   setHashKey: true,
   extend: true,
-  int: true,
+  toInt: true,
   inherit: true,
   noop: true,
   identity: true,
@@ -44,17 +44,16 @@
   isWindow: true,
   isScope: true,
   isFile: true,
+  isFormData: true,
   isBlob: true,
   isBoolean: true,
   isPromiseLike: true,
   trim: true,
+  escapeForRegexp: true,
   isElement: true,
   makeMap: true,
-  map: true,
-  size: true,
   includes: true,
   arrayRemove: true,
-  isLeafNode: true,
   copy: true,
   shallowCopy: true,
   equals: true,
@@ -83,6 +82,12 @@
   getBlockNodes: true,
   hasOwnProperty: true,
   createMap: true,
+
+  NODE_TYPE_ELEMENT: true,
+  NODE_TYPE_TEXT: true,
+  NODE_TYPE_COMMENT: true,
+  NODE_TYPE_DOCUMENT: true,
+  NODE_TYPE_DOCUMENT_FRAGMENT: true,
 */
 
 ////////////////////////////////////
@@ -118,7 +123,7 @@ var VALIDITY_STATE_PROPERTY = 'validity';
  * @param {string} string String to be converted to lowercase.
  * @returns {string} Lowercased string.
  */
-var lowercase = function(string){return isString(string) ? string.toLowerCase() : string;};
+var lowercase = function(string) {return isString(string) ? string.toLowerCase() : string;};
 var hasOwnProperty = Object.prototype.hasOwnProperty;
 
 /**
@@ -131,7 +136,7 @@ var hasOwnProperty = Object.prototype.hasOwnProperty;
  * @param {string} string String to be converted to uppercase.
  * @returns {string} Uppercased string.
  */
-var uppercase = function(string){return isString(string) ? string.toUpperCase() : string;};
+var uppercase = function(string) {return isString(string) ? string.toUpperCase() : string;};
 
 
 var manualLowercase = function(s) {
@@ -157,11 +162,12 @@ if ('i' !== 'I'.toLowerCase()) {
 }
 
 
-var /** holds major version number for IE or NaN for real browsers */
-    msie,
+var
+    msie,             // holds major version number for IE, or NaN if UA is not IE.
     jqLite,           // delay binding since jQuery could be loaded after us.
     jQuery,           // delay binding
     slice             = [].slice,
+    splice            = [].splice,
     push              = [].push,
     toString          = Object.prototype.toString,
     ngMinErr          = minErr('ng'),
@@ -172,13 +178,10 @@ var /** holds major version number for IE or NaN for real browsers */
     uid               = 0;
 
 /**
- * IE 11 changed the format of the UserAgent string.
- * See http://msdn.microsoft.com/en-us/library/ms537503.aspx
+ * documentMode is an IE-only property
+ * http://msdn.microsoft.com/en-us/library/ie/cc196988(v=vs.85).aspx
  */
-msie = int((/msie (\d+)/.exec(lowercase(navigator.userAgent)) || [])[1]);
-if (isNaN(msie)) {
-  msie = int((/trident\/.*; rv:(\d+)/.exec(lowercase(navigator.userAgent)) || [])[1]);
-}
+msie = document.documentMode;
 
 
 /**
@@ -194,7 +197,7 @@ function isArrayLike(obj) {
 
   var length = obj.length;
 
-  if (obj.nodeType === 1 && length) {
+  if (obj.nodeType === NODE_TYPE_ELEMENT && length) {
     return true;
   }
 
@@ -210,12 +213,17 @@ function isArrayLike(obj) {
  *
  * @description
  * Invokes the `iterator` function once for each item in `obj` collection, which can be either an
- * object or an array. The `iterator` function is invoked with `iterator(value, key)`, where `value`
- * is the value of an object property or an array element and `key` is the object property key or
- * array element index. Specifying a `context` for the function is optional.
+ * object or an array. The `iterator` function is invoked with `iterator(value, key, obj)`, where `value`
+ * is the value of an object property or an array element, `key` is the object property key or
+ * array element index and obj is the `obj` itself. Specifying a `context` for the function is optional.
  *
  * It is worth noting that `.forEach` does not iterate over inherited properties because it filters
  * using the `hasOwnProperty` method.
+ *
+ * Unlike ES262's
+ * [Array.prototype.forEach](http://www.ecma-international.org/ecma-262/5.1/#sec-15.4.4.18),
+ * Providing 'undefined' or 'null' values for `obj` will not throw a TypeError, but rather just
+ * return the value provided.
  *
    ```js
      var values = {name: 'misko', gender: 'male'};
@@ -240,22 +248,22 @@ function forEach(obj, iterator, context) {
         // Need to check if hasOwnProperty exists,
         // as on IE8 the result of querySelectorAll is an object without a hasOwnProperty function
         if (key != 'prototype' && key != 'length' && key != 'name' && (!obj.hasOwnProperty || obj.hasOwnProperty(key))) {
-          iterator.call(context, obj[key], key);
+          iterator.call(context, obj[key], key, obj);
         }
       }
     } else if (isArray(obj) || isArrayLike(obj)) {
       var isPrimitive = typeof obj !== 'object';
       for (key = 0, length = obj.length; key < length; key++) {
         if (isPrimitive || key in obj) {
-          iterator.call(context, obj[key], key);
+          iterator.call(context, obj[key], key, obj);
         }
       }
     } else if (obj.forEach && obj.forEach !== forEach) {
-        obj.forEach(iterator, context);
+        obj.forEach(iterator, context, obj);
     } else {
       for (key in obj) {
         if (obj.hasOwnProperty(key)) {
-          iterator.call(context, obj[key], key);
+          iterator.call(context, obj[key], key, obj);
         }
       }
     }
@@ -263,19 +271,9 @@ function forEach(obj, iterator, context) {
   return obj;
 }
 
-function sortedKeys(obj) {
-  var keys = [];
-  for (var key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      keys.push(key);
-    }
-  }
-  return keys.sort();
-}
-
 function forEachSorted(obj, iterator, context) {
-  var keys = sortedKeys(obj);
-  for ( var i = 0; i < keys.length; i++) {
+  var keys = Object.keys(obj).sort();
+  for (var i = 0; i < keys.length; i++) {
     iterator.call(context, obj[keys[i]], keys[i]);
   }
   return keys;
@@ -327,8 +325,10 @@ function setHashKey(obj, h) {
  * @kind function
  *
  * @description
- * Extends the destination object `dst` by copying all of the properties from the `src` object(s)
- * to `dst`. You can specify multiple `src` objects.
+ * Extends the destination object `dst` by copying own enumerable properties from the `src` object(s)
+ * to `dst`. You can specify multiple `src` objects. If you want to preserve original objects, you can do so
+ * by passing an empty object as the target: `var object = angular.extend({}, object1, object2)`.
+ * Note: Keep in mind that `angular.extend` does not support recursive merge (deep copy).
  *
  * @param {Object} dst Destination object.
  * @param {...Object} src Source object(s).
@@ -336,25 +336,29 @@ function setHashKey(obj, h) {
  */
 function extend(dst) {
   var h = dst.$$hashKey;
-  forEach(arguments, function(obj) {
-    if (obj !== dst) {
-      forEach(obj, function(value, key) {
-        dst[key] = value;
-      });
-    }
-  });
 
-  setHashKey(dst,h);
+  for (var i = 1, ii = arguments.length; i < ii; i++) {
+    var obj = arguments[i];
+    if (obj) {
+      var keys = Object.keys(obj);
+      for (var j = 0, jj = keys.length; j < jj; j++) {
+        var key = keys[j];
+        dst[key] = obj[key];
+      }
+    }
+  }
+
+  setHashKey(dst, h);
   return dst;
 }
 
-function int(str) {
+function toInt(str) {
   return parseInt(str, 10);
 }
 
 
 function inherit(parent, extra) {
-  return extend(new (extend(function() {}, {prototype:parent}))(), extra);
+  return extend(Object.create(parent), extra);
 }
 
 /**
@@ -392,6 +396,8 @@ noop.$inject = [];
        return (transformationFn || angular.identity)(value);
      };
    ```
+  * @param {*} value to be returned.
+  * @returns {*} the value passed in.
  */
 function identity($) {return $;}
 identity.$inject = [];
@@ -411,7 +417,7 @@ function valueFn(value) {return function() {return value;};}
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is undefined.
  */
-function isUndefined(value){return typeof value === 'undefined';}
+function isUndefined(value) {return typeof value === 'undefined';}
 
 
 /**
@@ -426,7 +432,7 @@ function isUndefined(value){return typeof value === 'undefined';}
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is defined.
  */
-function isDefined(value){return typeof value !== 'undefined';}
+function isDefined(value) {return typeof value !== 'undefined';}
 
 
 /**
@@ -442,7 +448,7 @@ function isDefined(value){return typeof value !== 'undefined';}
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is an `Object` but not `null`.
  */
-function isObject(value){
+function isObject(value) {
   // http://jsperf.com/isobject4
   return value !== null && typeof value === 'object';
 }
@@ -460,7 +466,7 @@ function isObject(value){
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is a `String`.
  */
-function isString(value){return typeof value === 'string';}
+function isString(value) {return typeof value === 'string';}
 
 
 /**
@@ -475,7 +481,7 @@ function isString(value){return typeof value === 'string';}
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is a `Number`.
  */
-function isNumber(value){return typeof value === 'number';}
+function isNumber(value) {return typeof value === 'number';}
 
 
 /**
@@ -521,7 +527,7 @@ var isArray = Array.isArray;
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is a `Function`.
  */
-function isFunction(value){return typeof value === 'function';}
+function isFunction(value) {return typeof value === 'function';}
 
 
 /**
@@ -558,6 +564,11 @@ function isFile(obj) {
 }
 
 
+function isFormData(obj) {
+  return toString.call(obj) === '[object FormData]';
+}
+
+
 function isBlob(obj) {
   return toString.call(obj) === '[object Blob]';
 }
@@ -575,6 +586,14 @@ function isPromiseLike(obj) {
 
 var trim = function(value) {
   return isString(value) ? value.trim() : value;
+};
+
+// Copied from:
+// http://docs.closure-library.googlecode.com/git/local_closure_goog_string_string.js.source.html#line1021
+// Prereq: s is a string.
+var escapeForRegexp = function(s) {
+  return s.replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').
+           replace(/\x08/g, '\\x08');
 };
 
 
@@ -602,52 +621,15 @@ function isElement(node) {
  */
 function makeMap(str) {
   var obj = {}, items = str.split(","), i;
-  for ( i = 0; i < items.length; i++ )
+  for (i = 0; i < items.length; i++)
     obj[ items[i] ] = true;
   return obj;
 }
 
 
 function nodeName_(element) {
-  return lowercase(element.nodeName || element[0].nodeName);
+  return lowercase(element.nodeName || (element[0] && element[0].nodeName));
 }
-
-
-function map(obj, iterator, context) {
-  var results = [];
-  forEach(obj, function(value, index, list) {
-    results.push(iterator.call(context, value, index, list));
-  });
-  return results;
-}
-
-
-/**
- * @description
- * Determines the number of elements in an array, the number of properties an object has, or
- * the length of a string.
- *
- * Note: This function is used to augment the Object type in Angular expressions. See
- * {@link angular.Object} for more information about Angular arrays.
- *
- * @param {Object|Array|string} obj Object, array, or string to inspect.
- * @param {boolean} [ownPropsOnly=false] Count only "own" properties in an object
- * @returns {number} The size of `obj` or `0` if `obj` is neither an object nor an array.
- */
-function size(obj, ownPropsOnly) {
-  var count = 0, key;
-
-  if (isArray(obj) || isString(obj)) {
-    return obj.length;
-  } else if (isObject(obj)) {
-    for (key in obj)
-      if (!ownPropsOnly || obj.hasOwnProperty(key))
-        count++;
-  }
-
-  return count;
-}
-
 
 function includes(array, obj) {
   return Array.prototype.indexOf.call(array, obj) != -1;
@@ -655,21 +637,9 @@ function includes(array, obj) {
 
 function arrayRemove(array, value) {
   var index = array.indexOf(value);
-  if (index >=0)
+  if (index >= 0)
     array.splice(index, 1);
   return value;
-}
-
-function isLeafNode (node) {
-  if (node) {
-    switch (nodeName_(node)) {
-    case "option":
-    case "pre":
-    case "title":
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -682,7 +652,7 @@ function isLeafNode (node) {
  * Creates a deep copy of `source`, which should be an object or an array.
  *
  * * If no destination is supplied, a copy of the object or array is created.
- * * If a destination is provided, all of its elements (for array) or properties (for objects)
+ * * If a destination is provided, all of its elements (for arrays) or properties (for objects)
  *   are deleted and then all elements/properties from the source are copied to it.
  * * If `source` is not an object or array (inc. `null` and `undefined`), `source` is returned.
  * * If `source` is identical to 'destination' an exception will be thrown.
@@ -769,7 +739,7 @@ function copy(source, destination, stackSource, stackDest) {
     var result;
     if (isArray(source)) {
       destination.length = 0;
-      for ( var i = 0; i < source.length; i++) {
+      for (var i = 0; i < source.length; i++) {
         result = copy(source[i], null, stackSource, stackDest);
         if (isObject(source[i])) {
           stackSource.push(source[i]);
@@ -786,8 +756,8 @@ function copy(source, destination, stackSource, stackDest) {
           delete destination[key];
         });
       }
-      for ( var key in source) {
-        if(source.hasOwnProperty(key)) {
+      for (var key in source) {
+        if (source.hasOwnProperty(key)) {
           result = copy(source[key], null, stackSource, stackDest);
           if (isObject(source[key])) {
             stackSource.push(source[key]);
@@ -868,7 +838,7 @@ function equals(o1, o2) {
       if (isArray(o1)) {
         if (!isArray(o2)) return false;
         if ((length = o1.length) == o2.length) {
-          for(key=0; key<length; key++) {
+          for (key = 0; key < length; key++) {
             if (!equals(o1[key], o2[key])) return false;
           }
           return true;
@@ -881,12 +851,12 @@ function equals(o1, o2) {
       } else {
         if (isScope(o1) || isScope(o2) || isWindow(o1) || isWindow(o2) || isArray(o2)) return false;
         keySet = {};
-        for(key in o1) {
+        for (key in o1) {
           if (key.charAt(0) === '$' || isFunction(o1[key])) continue;
           if (!equals(o1[key], o2[key])) return false;
           keySet[key] = true;
         }
-        for(key in o2) {
+        for (key in o2) {
           if (!keySet.hasOwnProperty(key) &&
               key.charAt(0) !== '$' &&
               o2[key] !== undefined &&
@@ -954,7 +924,7 @@ function bind(self, fn) {
     return curryArgs.length
       ? function() {
           return arguments.length
-            ? fn.apply(self, curryArgs.concat(slice.call(arguments, 0)))
+            ? fn.apply(self, concat(curryArgs, arguments, 0))
             : fn.apply(self, curryArgs);
         }
       : function() {
@@ -997,12 +967,16 @@ function toJsonReplacer(key, value) {
  * stripped since angular uses this notation internally.
  *
  * @param {Object|Array|Date|string|number} obj Input to be serialized into JSON.
- * @param {boolean=} pretty If set to true, the JSON output will contain newlines and whitespace.
+ * @param {boolean|number=} pretty If set to true, the JSON output will contain newlines and whitespace.
+ *    If set to an integer, the JSON output will contain that many spaces per indentation (the default is 2).
  * @returns {string|undefined} JSON-ified string representing `obj`.
  */
 function toJson(obj, pretty) {
   if (typeof obj === 'undefined') return undefined;
-  return JSON.stringify(obj, toJsonReplacer, pretty ? '  ' : null);
+  if (!isNumber(pretty)) {
+    pretty = pretty ? 2 : null;
+  }
+  return JSON.stringify(obj, toJsonReplacer, pretty);
 }
 
 
@@ -1016,7 +990,7 @@ function toJson(obj, pretty) {
  * Deserializes a JSON string.
  *
  * @param {string} json JSON string to deserialize.
- * @returns {Object|Array|string|number} Deserialized thingy.
+ * @returns {Object|Array|string|number} Deserialized JSON string.
  */
 function fromJson(json) {
   return isString(json)
@@ -1034,16 +1008,14 @@ function startingTag(element) {
     // turns out IE does not let you set .html() on elements which
     // are not allowed to have children. So we just ignore it.
     element.empty();
-  } catch(e) {}
-  // As Per DOM Standards
-  var TEXT_NODE = 3;
+  } catch (e) {}
   var elemHtml = jqLite('<div>').append(element).html();
   try {
-    return element[0].nodeType === TEXT_NODE ? lowercase(elemHtml) :
+    return element[0].nodeType === NODE_TYPE_TEXT ? lowercase(elemHtml) :
         elemHtml.
           match(/^(<[^>]+>)/)[1].
           replace(/^<([\w\-]+)/, function(match, nodeName) { return '<' + lowercase(nodeName); });
-  } catch(e) {
+  } catch (e) {
     return lowercase(elemHtml);
   }
 
@@ -1063,7 +1035,7 @@ function startingTag(element) {
 function tryDecodeURIComponent(value) {
   try {
     return decodeURIComponent(value);
-  } catch(e) {
+  } catch (e) {
     // Ignore any invalid uri component
   }
 }
@@ -1076,14 +1048,14 @@ function tryDecodeURIComponent(value) {
 function parseKeyValue(/**string*/keyValue) {
   var obj = {}, key_value, key;
   forEach((keyValue || "").split('&'), function(keyValue) {
-    if ( keyValue ) {
+    if (keyValue) {
       key_value = keyValue.replace(/\+/g,'%20').split('=');
       key = tryDecodeURIComponent(key_value[0]);
-      if ( isDefined(key) ) {
+      if (isDefined(key)) {
         var val = isDefined(key_value[1]) ? tryDecodeURIComponent(key_value[1]) : true;
         if (!hasOwnProperty.call(obj, key)) {
           obj[key] = val;
-        } else if(isArray(obj[key])) {
+        } else if (isArray(obj[key])) {
           obj[key].push(val);
         } else {
           obj[key] = [obj[key],val];
@@ -1156,7 +1128,7 @@ var ngAttrPrefixes = ['ng-', 'data-ng-', 'ng:', 'x-ng-'];
 function getNgAttribute(element, ngAttr) {
   var attr, i, ii = ngAttrPrefixes.length;
   element = jqLite(element);
-  for (i=0; i<ii; ++i) {
+  for (i = 0; i < ii; ++i) {
     attr = ngAttrPrefixes[i] + ngAttr;
     if (isString(attr = element.attr(attr))) {
       return attr;
@@ -1191,7 +1163,7 @@ function getNgAttribute(element, ngAttr) {
  * {@link angular.bootstrap} instead. AngularJS applications cannot be nested within each other.
  *
  * You can specify an **AngularJS module** to be used as the root module for the application.  This
- * module will be loaded into the {@link auto.$injector} when the application is bootstrapped and
+ * module will be loaded into the {@link auto.$injector} when the application is bootstrapped. It
  * should contain the application code needed or have dependencies on other modules that will
  * contain the code. See {@link angular.module} for more information.
  *
@@ -1199,7 +1171,7 @@ function getNgAttribute(element, ngAttr) {
  * document would not be compiled, the `AppController` would not be instantiated and the `{{ a+b }}`
  * would not be resolved to `3`.
  *
- * `ngApp` is the easiest, and most common, way to bootstrap an application.
+ * `ngApp` is the easiest, and most common way to bootstrap an application.
  *
  <example module="ngAppDemo">
    <file name="index.html">
@@ -1361,13 +1333,13 @@ function angularInit(element, bootstrap) {
  * @param {DOMElement} element DOM element which is the root of angular application.
  * @param {Array<String|Function|Array>=} modules an array of modules to load into the application.
  *     Each item in the array should be the name of a predefined module or a (DI annotated)
- *     function that will be invoked by the injector as a run block.
+ *     function that will be invoked by the injector as a `config` block.
  *     See: {@link angular.module modules}
  * @param {Object=} config an object for defining configuration options for the application. The
  *     following keys are supported:
  *
- *     - `strictDi`: disable automatic function annotation for the application. This is meant to
- *       assist in finding bugs which break minified code.
+ * * `strictDi` - disable automatic function annotation for the application. This is meant to
+ *   assist in finding bugs which break minified code. Defaults to `false`.
  *
  * @returns {auto.$injector} Returns the newly created injector for this app.
  */
@@ -1450,7 +1422,7 @@ function reloadWithDebugInfo() {
   window.location.reload();
 }
 
-/*
+/**
  * @name angular.getTestability
  * @module ng
  * @description
@@ -1459,7 +1431,12 @@ function reloadWithDebugInfo() {
  * @param {DOMElement} element DOM element which is the root of angular application.
  */
 function getTestability(rootElement) {
-  return angular.element(rootElement).injector().get('$$testability');
+  var injector = angular.element(rootElement).injector();
+  if (!injector) {
+    throw ngMinErr('test',
+      'no injector found for element argument to getTestability');
+  }
+  return injector.get('$$testability');
 }
 
 var SNAKE_CASE_REGEXP = /[A-Z]/g;
@@ -1500,9 +1477,13 @@ function bindJQuery() {
     // the $destroy event on all removed nodes.
     originalCleanData = jQuery.cleanData;
     jQuery.cleanData = function(elems) {
+      var events;
       if (!skipDestroyOnNextJQueryCleanData) {
         for (var i = 0, elem; (elem = elems[i]) != null; i++) {
-          jQuery(elem).triggerHandler('$destroy');
+          events = jQuery._data(elem, "events");
+          if (events && events.$destroy) {
+            jQuery(elem).triggerHandler('$destroy');
+          }
         }
       } else {
         skipDestroyOnNextJQueryCleanData = false;
@@ -1613,3 +1594,9 @@ function getBlockNodes(nodes) {
 function createMap() {
   return Object.create(null);
 }
+
+var NODE_TYPE_ELEMENT = 1;
+var NODE_TYPE_TEXT = 3;
+var NODE_TYPE_COMMENT = 8;
+var NODE_TYPE_DOCUMENT = 9;
+var NODE_TYPE_DOCUMENT_FRAGMENT = 11;

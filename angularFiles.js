@@ -5,6 +5,7 @@ var angularFiles = {
     'src/minErr.js',
     'src/Angular.js',
     'src/loader.js',
+    'src/stringify.js',
     'src/AngularPublic.js',
     'src/jqLite.js',
     'src/apis.js',
@@ -52,6 +53,7 @@ var angularFiles = {
     'src/ng/directive/form.js',
     'src/ng/directive/input.js',
     'src/ng/directive/ngBind.js',
+    'src/ng/directive/ngChange.js',
     'src/ng/directive/ngClass.js',
     'src/ng/directive/ngCloak.js',
     'src/ng/directive/ngController.js',
@@ -60,7 +62,10 @@ var angularFiles = {
     'src/ng/directive/ngIf.js',
     'src/ng/directive/ngInclude.js',
     'src/ng/directive/ngInit.js',
+    'src/ng/directive/ngList.js',
+    'src/ng/directive/ngModel.js',
     'src/ng/directive/ngNonBindable.js',
+    'src/ng/directive/ngOptions.js',
     'src/ng/directive/ngPluralize.js',
     'src/ng/directive/ngRepeat.js',
     'src/ng/directive/ngShowHide.js',
@@ -69,10 +74,12 @@ var angularFiles = {
     'src/ng/directive/ngTransclude.js',
     'src/ng/directive/script.js',
     'src/ng/directive/select.js',
-    'src/ng/directive/style.js'
+    'src/ng/directive/style.js',
+    'src/ng/directive/validators.js'
   ],
 
   'angularLoader': [
+    'stringify.js',
     'src/minErr.js',
     'src/loader.js'
   ],
@@ -108,6 +115,9 @@ var angularFiles = {
       'src/ngTouch/directive/ngClick.js',
       'src/ngTouch/directive/ngSwipe.js'
     ],
+    'ngAria': [
+      'src/ngAria/aria.js'
+    ]
   },
 
   'angularScenario': [
@@ -141,7 +151,8 @@ var angularFiles = {
     'test/ngRoute/**/*.js',
     'test/ngSanitize/**/*.js',
     'test/ngMock/*.js',
-    'test/ngTouch/**/*.js'
+    'test/ngTouch/**/*.js',
+    'test/ngAria/*.js'
   ],
 
   'karma': [
@@ -175,7 +186,8 @@ var angularFiles = {
     'test/ngRoute/**/*.js',
     'test/ngResource/*.js',
     'test/ngSanitize/**/*.js',
-    'test/ngTouch/**/*.js'
+    'test/ngTouch/**/*.js',
+    'test/ngAria/*.js'
   ],
 
   'karmaJquery': [
@@ -203,7 +215,8 @@ angularFiles['angularSrcModules'] = [].concat(
   angularFiles['angularModules']['ngRoute'],
   angularFiles['angularModules']['ngSanitize'],
   angularFiles['angularModules']['ngMock'],
-  angularFiles['angularModules']['ngTouch']
+  angularFiles['angularModules']['ngTouch'],
+  angularFiles['angularModules']['ngAria']
 );
 
 if (exports) {

@@ -11,9 +11,8 @@
  * make the link go to the wrong URL if the user clicks it before
  * Angular has a chance to replace the `{{hash}}` markup with its
  * value. Until Angular replaces the markup the link will be broken
- * and will most likely return a 404 error.
- *
- * The `ngHref` directive solves this problem.
+ * and will most likely return a 404 error. The `ngHref` directive
+ * solves this problem.
  *
  * The wrong way to write it:
  * ```html
@@ -342,22 +341,34 @@
 
 var ngAttributeAliasDirectives = {};
 
-
 // boolean attrs are evaluated
 forEach(BOOLEAN_ATTR, function(propName, attrName) {
   // binding to multiple is not supported
   if (propName == "multiple") return;
 
+  function defaultLinkFn(scope, element, attr) {
+    scope.$watch(attr[normalized], function ngBooleanAttrWatchAction(value) {
+      attr.$set(attrName, !!value);
+    });
+  }
+
   var normalized = directiveNormalize('ng-' + attrName);
+  var linkFn = defaultLinkFn;
+
+  if (propName === 'checked') {
+    linkFn = function(scope, element, attr) {
+      // ensuring ngChecked doesn't interfere with ngModel when both are set on the same input
+      if (attr.ngModel !== attr[normalized]) {
+        defaultLinkFn(scope, element, attr);
+      }
+    };
+  }
+
   ngAttributeAliasDirectives[normalized] = function() {
     return {
       restrict: 'A',
       priority: 100,
-      link: function(scope, element, attr) {
-        scope.$watch(attr[normalized], function ngBooleanAttrWatchAction(value) {
-          attr.$set(attrName, !!value);
-        });
-      }
+      link: linkFn
     };
   };
 });
